@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+selenium = "*"
+piplint = "*"
+undetected-chromedriver = "*"
+pytest = "*"
+ffmpeg-python = "*"
+pandas = "*"
+asyncio = "*"
+python-dotenv = "*"
+tk = "*"
+anticaptchaofficial = "*"
+openpyxl = "*"
+
+[dev-packages]
+pylint = "*"
+autopep8 = "*"
+
+[requires]
+python_version = "3.11"
