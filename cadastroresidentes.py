@@ -1,4 +1,3 @@
-import asyncio
 import tkinter as tk
 from tkinter import filedialog
 import random
@@ -9,6 +8,7 @@ import undetected_chromedriver as uc
 from anticaptchaofficial.recaptchav2proxyless import *
 from dotenv import load_dotenv
 from selenium import webdriver
+from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -17,8 +17,8 @@ load_dotenv()
 API_KEY=os.getenv('API_KEY')
 CPF=os.getenv('CPF')
 SENHA=os.getenv('SENHA')
-Contador=0
-tempo=round(random.uniform(1,4),2)
+tempo=round(random.uniform(1,5),3)
+print(tempo)
 
 # Cria a janela principal
 root = tk.Tk()
@@ -28,15 +28,14 @@ root.withdraw()
 file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
 
 # Lê o arquivo Excel e carrega em um DataFrame pandas
-df = pd.read_excel(file_path)
+df = pd.read_excel(file_path, dtype=str)
 
 # Inicializa o navegador (Chrome, neste exemplo)
 driver = uc.Chrome()
 
-#driver = webdriver.Chrome()
-
 # Abre o site
 driver.get('http://sinar.mec.gov.br/')
+
 try:
     # Aguarda até que o botão "Entrar" esteja disponível
     btn_entrar = WebDriverWait(driver, 10).until(
@@ -84,7 +83,6 @@ try:
 
     #adicionar verificação de Captcha caso aconteça (estudar a recaptcha do GOV)
 
-
     #Localiza e espera o link de acesso a COREMU
     element = WebDriverWait(driver, 10).until(
     EC.presence_of_element_located((By.CSS_SELECTOR, 'a[href="/cnrms/index/14628"]'))
@@ -113,7 +111,7 @@ try:
     cadastrar_residente.click()
     time.sleep(tempo)
 
-    #Selecionando o frame mais a frente    
+    #Selecionando o frame mais a frente
     driver.switch_to.frame(0)
 
     #Clicar no elemento do iframe do Recaptcha
@@ -126,13 +124,16 @@ try:
     # Volta para o frame pai
     driver.switch_to.parent_frame()
     driver.switch_to.default_content()  # opcional, para garantir que está no topo da estrutura de frames
-    time.sleep(tempo)
+    time.sleep(5)
     
-    if len(driver.find_elements(By.XPATH,('//*[@id="rc-imageselect"]'))) > 0:
+    rc_imageselect_element = driver.find_element(By.XPATH,('//*[@id="rc-imageselect"]'))
+
+    if rc_imageselect_element.is_displayed():
+        #if len(driver.find_elements(By.XPATH,('//*[@id="rc-imageselect"]'))) > 0:
         sitekey = driver.find_element(By.XPATH, '//*[@id="formInserirResidente"]')
         sitekey_html = sitekey.get_attribute('outerHTML')
         sitekey_clean=sitekey_html.split('"><div style')[0].split('data-sitekey="')[1]
-                
+
         #Define a URL do Recaptcha
         URL='http://sinar.mec.gov.br/residentes/gerenciar/inserir'
         solver = recaptchaV2Proxyless()
@@ -140,25 +141,25 @@ try:
         solver.set_key(API_KEY)
         solver.set_website_url(URL)
         solver.set_website_key(sitekey_clean)
-
         g_response = solver.solve_and_return_solution()
+
         if g_response!= 0:
-            print("g_response"+g_response)
             #Faz o Navegador abrir a box de texto do Recaptcha
             driver.execute_script('var element=document.getElementById("g-recaptcha-response"); element.style.display="";')
-                
+
             #adiciona o token do Recaptcha
             driver.execute_script("""document.getElementById("g-recaptcha-response").innerHTML = arguments[0]""", g_response)
-                        
+            driver.execute_script("""document.getElementById("recaptcha-token").value = arguments[0]""", g_response)
+
             #Oculta novamente a box de texto
             driver.execute_script('var element=document.getElementById("g-recaptcha-response"); element.style.display="none";')
             btn_verificar=WebDriverWait(driver,10).until(
             EC.presence_of_element_located((By.XPATH, '//*[@id="recaptcha-verify-button"]'))
             )
             btn_verificar.click()
-            time.sleep (tempo)            
-                    
-            #Digita o CPF do residente na página de cadastro de residente            
+            time.sleep (tempo)
+
+            #Digita o CPF do residente na página de cadastro de residente
             # cpf_residente=WebDriverWait(driver,10).until(
             #     EC.presence_of_element_located((By.ID, 'nuCpf'))
             #     )
@@ -169,7 +170,8 @@ try:
                 EC.presence_of_element_located((By.ID, 'nuCpf'))
                 )
                 cpf_residente.send_keys(row['residenteMatriculado.cpf'])
-    
+                time.sleep(tempo)
+                
                 #Clica botão de pesquisar na página de cadastro de residente
                 btn_cpf_residente=WebDriverWait(driver,10).until(
                 EC.presence_of_element_located((By.ID,'btnPesquisar'))  
@@ -216,25 +218,25 @@ try:
                 time.sleep (tempo)
                     
                 # Seleciona a opção correspondente ao tipo de formação
-                residente_uf = Select(driver.find_element(By.ID, 'tpFormacao'))
-                residente_uf.select_by_visible_text(row['residente.dadosResidente.tipo.formação'])
+                residente_formacao = Select(driver.find_element(By.ID, 'tpFormacao'))
+                residente_formacao.select_by_visible_text(row['residente.dadosResidente.tipo.formação'])
                 time.sleep (tempo)
-
-                # Seleciona a opção correspondente a nacionalidade da instituição
-                residente_uf = Select(driver.find_element(By.ID, 'noPais'))
-                residente_uf.select_by_visible_text(row['residente.dadosResidente.dadosPessoais.pais.descricao'])
-                time.sleep (tempo)
+                if row['residente.dadosResidente.tipo.formação']!='Graduação':
+                    # Seleciona a opção correspondente a nacionalidade da instituição
+                    residente_pais = Select(driver.find_element(By.ID, 'noPais'))
+                    residente_pais.select_by_visible_text(row['residente.dadosResidente.dadosPessoais.pais.descricao'])
+                    time.sleep (tempo)
 
                 # Digita opção correspondente ao número de registro do Conselho do residente
-                residente_uf = WebDriverWait(driver, 10).until(
+                residente_registro = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, 'nuRegistroProfissional'))
                 )
-                residente_uf.send_keys(row['residente.dadosResidente.dadosProfissionais.numeroInscricao'])
+                residente_registro.send_keys(row['residente.dadosResidente.dadosProfissionais.numeroInscricao'])
                 time.sleep (tempo)
 
                 # Seleciona a opção correspondente à UF do Conselho do residente
-                residente_uf = Select(driver.find_element(By.ID, 'sgUfRegistro'))
-                residente_uf.select_by_visible_text(row['residente.dadosResidente.dadosProfissionais.numeroInscricao.uf'])
+                residente_uf_registro = Select(driver.find_element(By.ID, 'sgUfRegistro'))
+                residente_uf_registro.select_by_visible_text(row['residente.dadosResidente.dadosProfissionais.numeroInscricao.uf'])
                 time.sleep (tempo)
 
                 # Seleciona a opção correspondente à área profissional do residente
@@ -268,22 +270,16 @@ try:
             print("task finished with error"+solver.error_code)
                 # Salva as alterações na planilha
         df.to_excel('residentes-atualizado', index=False)
-          
+
     else:
-        #Digita o CPF do residente na página de cadastro de residente            
-        #cpf_residente=WebDriverWait(driver,10).until(
-        #EC.presence_of_element_located((By.ID, 'nuCpf'))
-        #)
-        #cpf_residente.send_keys('05508882413')
-            
-        
         for index, row in df.iterrows():
             # Digita o CPF do residente
             cpf_residente = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, 'nuCpf'))
             )
             cpf_residente.send_keys(row['residenteMatriculado.cpf'])
-
+            time.sleep(tempo)
+            
             #Clica botão de pesquisar na página de cadastro de residente
             btn_cpf_residente=WebDriverWait(driver,10).until(
             EC.presence_of_element_located((By.ID,'btnPesquisar'))  
@@ -330,25 +326,25 @@ try:
             time.sleep (tempo)
                 
             # Seleciona a opção correspondente ao tipo de formação
-            residente_uf = Select(driver.find_element(By.ID, 'tpFormacao'))
-            residente_uf.select_by_visible_text(row['residente.dadosResidente.tipo.formação'])
+            residente_formacao = Select(driver.find_element(By.ID, 'tpFormacao'))
+            residente_formacao.select_by_visible_text(row['residente.dadosResidente.tipo.formação'])
             time.sleep (tempo)
-
-            # Seleciona a opção correspondente a nacionalidade da instituição
-            residente_uf = Select(driver.find_element(By.ID, 'noPais'))
-            residente_uf.select_by_visible_text(row['residente.dadosResidente.dadosPessoais.pais.descricao'])
-            time.sleep (tempo)
+            if row['residente.dadosResidente.tipo.formação'] != 'Graduação':
+                # Seleciona a opção correspondente a nacionalidade da instituição
+                residente_pais = Select(driver.find_element(By.ID, 'noPais'))
+                residente_pais.select_by_visible_text(row['residente.dadosResidente.dadosPessoais.pais.descricao'])
+                time.sleep (tempo)
 
             # Digita opção correspondente ao número de registro do Conselho do residente
-            residente_uf = WebDriverWait(driver, 10).until(
+            residente_registro = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, 'nuRegistroProfissional'))
             )
-            residente_uf.send_keys(row['residente.dadosResidente.dadosProfissionais.numeroInscricao'])
+            residente_registro.send_keys(row['residente.dadosResidente.dadosProfissionais.numeroInscricao'])
             time.sleep (tempo)
 
             # Seleciona a opção correspondente à UF do Conselho do residente
-            residente_uf = Select(driver.find_element(By.ID, 'sgUfRegistro'))
-            residente_uf.select_by_visible_text(row['residente.dadosResidente.dadosProfissionais.numeroInscricao.uf'])
+            residente_uf_registro = Select(driver.find_element(By.ID, 'sgUfRegistro'))
+            residente_uf_registro.select_by_visible_text(row['residente.dadosResidente.dadosProfissionais.numeroInscricao.uf'])
             time.sleep (tempo)
 
             # Seleciona a opção correspondente à área profissional do residente
